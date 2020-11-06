@@ -1,0 +1,111 @@
+---
+title: "a3_task3_jessica_madden"
+author: "Jessica Madden"
+date: "November 5, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(here)
+library(tidyverse)
+library(janitor)
+library(kableExtra)
+library(lubridate)
+```
+
+Citation: [Reed, D. 2020. SBC LTER: Reef: Long-term experiment: Kelp removal: Urchin size frequency distribution ver 20. Environmental Data Initiative.](https://doi.org/10.6073/pasta/5a1e9ef03aa47bd2225c0bb98a02a63b)
+
+### Read in urchin data
+
+```{r}
+urchins <- read.csv(here("data", "urchins.csv")) %>% #Reads in file from data folder
+  clean_names() #Converts column names to lower_snake_case
+```
+
+### Section 1: Size comparisons, purple and red urchins
+
+#### Exploratory data visualization:
+
+Histogram of urchin sizes
+
+```{r}
+#Create histogram of purple and red urchin diameter data
+ggplot(urchins, aes(x = size)) +
+  geom_histogram(bins = 25) +
+  facet_wrap(~common_name) +
+  labs(x = "Urchin diameter (cm)")
+```
+
+Boxplot of urchin sizes
+
+```{r}
+#Create boxplot of purple and red urchin diameter data
+
+ggplot(urchins, aes(x = common_name, 
+                    y = size)) +
+  geom_boxplot() +
+  labs(x = "Common name", 
+       y = "Urchin diameter (cm)") +
+  theme_light()
+```
+
+#### Descriptive statistics table:
+
+```{r}
+#Summary statistics on each species of urchin
+
+urchins %>% 
+  select(size, common_name) %>% 
+  group_by(common_name) %>% 
+  summarize("Mean" = mean(size), 
+            "Median" = median(size), 
+            "Standard deviation" = sd(size), 
+            "Sample size" = n()) %>% 
+  kbl() %>% 
+  kable_minimal()
+```
+
+
+#### Data takeaways:
+
+Overall, there seem to be differences in the size distributions of these two species of urchin. Both distributions appear to be normally distributed, though purple urchins seem to be slightly positively skewed. Purple urchins are smaller on average than red urchins, with an mean diameter of 4.5 cm compared to 6.8 cm. This reflects a 34% difference in mean urchin diameter between the two species. Also worthwile to note is the greater spread in the sample distribution of red urchins, as shown by the more leptokurtic histogram of purple urchins and also by the greater standard deviation of 1.9 cm for red urchins compared to 1.2 cm for purple urchins.
+
+### Section 2: Explore purple urchin counts by site and year
+
+Some wrangling:
+
+```{r}
+purple_urchins <- urchins %>% 
+  filter(common_name == "Purple Urchin") %>% #Filter for only purps
+  mutate(date = mdy(date)) %>% #convert date to actual Date class
+  mutate(year = year(date)) %>% #Create new column of just year
+  mutate(site_full = case_when( #Create new column site_full with full site names from each code
+    site == "NAPL" ~ "Naples Reef", 
+    site == "AQUE" ~ "Arroyo Quemado Reef", 
+    site == "CARP" ~ "Carpinteria Reef", 
+    site == "MOHK" ~ "Mohawk Reef", 
+    site == "IVEE" ~ "Isla Vista Reef"
+  ))
+
+#Create summary table of total number of purple urchins counted at each site per year
+
+purple_urchins_summary <- purple_urchins %>% 
+  group_by(site_full, year) %>% 
+  count(common_name) 
+```
+
+Area plots of purple urchins by site:
+
+```{r}
+ggplot(purple_urchins_summary, aes(x = year, y = n, group = site_full, fill = site_full)) +
+  geom_area() +
+  labs(x = "Year", 
+       y = "Count", 
+       title = "Purple urchins observed at each LTER reef 2008-2020") +
+  facet_wrap(~site_full) + #Splits into faceted graphs
+  theme(legend.position = "none", #Removes legend
+        panel.spacing = unit(1, "lines")) + #Adjusts spacing between faceted graphs
+  scale_x_continuous(breaks = scales::breaks_extended(Q = c(1, 5, 2, 4, 3))) #fixed wonky x-axis! 
+```
+
