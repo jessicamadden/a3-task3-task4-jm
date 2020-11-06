@@ -1,0 +1,105 @@
+---
+title: "a3_task4_jessica_madden"
+author: "Jessica Madden"
+date: "November 6, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(here)
+library(tidyverse)
+library(janitor)
+library(kableExtra)
+library(lubridate)
+```
+
+Citation: [Reed, D. 2020. SBC LTER: Reef: Long-term experiment: Kelp removal: Urchin size frequency distribution ver 20. Environmental Data Initiative.](https://doi.org/10.6073/pasta/5a1e9ef03aa47bd2225c0bb98a02a63b)
+
+### Read in urchin data
+
+```{r}
+urchins <- read.csv(here("data", "urchins.csv")) %>% #Reads in file from data folder
+  clean_names() #Converts column names to lower_snake_case
+```
+
+### Comparison of purple urchin size inside and outside kelp removal plot at Naples Reef
+
+Some wrangling:
+
+```{r}
+urchins_naples <- urchins %>% 
+  filter(site == "NAPL") %>% #Keeps only Naples Reef observations
+  filter(common_name == "Purple Urchin" ) %>% #Keeps only puple urchin observations
+  mutate(date = mdy(date)) %>% #Converts date column into date format
+  mutate(month = month(date)) %>% #Creates column with month extracted
+  mutate(year = year(date)) %>% #Creates column with year extracted
+  filter(month == 1 & year == 2010) #Keeps only observations from Jan 2010
+```
+
+#### Some exploratory data visualization
+
+Histogram of urchin size distribution in control and experimental treatments:
+
+```{r}
+ggplot(urchins_naples, aes(x = size)) +
+  geom_histogram(bins = 15) +
+  facet_wrap(~treatment) +
+  labs(x = "Urchin diameter (cm)", 
+       y = "Count", 
+       title = "Distribution of Purple Urchin Sizes at Naples Reef, January 2010") +
+  theme_light()
+```
+
+QQ-plots of urchin size distribution in control and experimental treatments:
+
+```{r}
+ggplot(urchins_naples, aes(sample = size)) +
+  geom_qq() +
+  facet_wrap(~treatment) +
+  labs(title = "Quantile-Quantile Plots of Purple Urchin Sizes at Naples Reef")
+```
+
+##### Data takeaways
+
+Visually inspecting the histograms, the distribution of purple urchin sizes from the kelp removal plot at Naples Reef appear slightly bimodal, but overall normally distributed. The size distribution of the urchins from the control plot also appear to be normal, with a slight positive skew. Examining the QQ-plots reveals a linear relationship, also indicating a normal distribution. Considering the smaple size and the histograms and QQ-plots, I will go ahead and perform a t-test for means comparison.
+
+#### Descriptive statistics
+
+```{r}
+urchins_naples_stats <- urchins_naples %>%
+  group_by(treatment) %>% 
+  summarize("Mean" = mean(size), 
+            "Median" = median(size), 
+            "Standard deviation" = sd(size), 
+            "Sample size" = n()) %>% 
+  kbl() %>% 
+  kable_minimal()
+
+urchins_naples_stats
+
+```
+
+#### Two-sample t-test on two treatments of Naples purple urchins
+
+```{r}
+# Split df into groups and pull sample vectors
+
+urchins_napl_ann <- urchins_naples %>% 
+  filter(treatment == "ANNUAL") %>% 
+  pull(size)
+  
+urchins_napl_ctrl <- urchins_naples %>% 
+  filter(treatment == "CONTROL") %>% 
+  pull(size)
+```
+
+```{r}
+# Run a two sample t-test from vectors
+
+t.test(urchins_napl_ann, urchins_napl_ctrl)
+```
+
+#### Discussion 
+
+The null hypothesis is that purple urchins from Naples in January 2010 have the same size distribution in the annual kelp removal plot as the control plot. The annual and control samples of urchin sizes have sample means of 3.9 cm and 3.7 cm, respectively. This is only a difference of 0.2 cm, or 5%, indicating these two population samples are fairly similar in their average diameter. The standard deviations of these population samples are also fairly similar, indicating a comparable spread in the data (annual treatment sd = 1.0 cm, control treatment sd = 0.9 cm). These standard deviations are both greater than the difference in the sample means, indicating a large amount of overlap in the size distributions of these two groups. The p-value from the two-sample t-test represents that there is a 25% chance that you could pull sample means that are at least as different as 3.9 cm and 3.7 cm, if they are drawn from populations with the same mean. A p-value of .25 is not enough evidence to conclude that these samples are from populations that have unequal means. In other words, there is not enough evidence to reject the null hypothesis.
